@@ -278,13 +278,14 @@ VALUES
 
 -- C. Supprimez les casques grecs qui n'ont jamais été pris lors d'une bataille.
 
-DELETE FROM type_casque
-WHERE id_type_casque IN (
-    SELECT tc.id_type_casque
-    FROM type_casque tc
-    LEFT JOIN casque c ON tc.id_type_casque = ca.id_type_casque
-            WHERE ca.id_casque IS NULL
-        );
+DELETE FROM casque
+WHERE id_type_casque = '2'
+AND id_casque NOT IN
+(
+	SELECT 
+		pc.id_casque 
+	FROM prendre_casque pc
+);
 
 -- D. Modifiez l'adresse de Zérozérosix : il a été mis en prison à Condate.
 
@@ -294,5 +295,15 @@ SET
 	id_lieu = 9
 WHERE id_personnage = 23;
 
--- E.
+-- E. La potion 'Soupe' ne doit plus contenir de persil.
 
+DELETE FROM composer
+WHERE id_potion = 9 AND id_ingredient = 19
+
+-- F. Obélix s'est trompé : ce sont 42 casques Weisenau, et non Ostrogoths, qu'il a pris lors de la bataille 'Attaque de la banque postale'. Corrigez son erreur !
+
+UPDATE prendre_casque pc
+SET 
+	pc.id_casque = 10,
+	pc.qte = 42
+WHERE pc.id_bataille = 9
