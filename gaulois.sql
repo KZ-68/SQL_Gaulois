@@ -12,8 +12,9 @@ WHERE
 
 CREATE VIEW persoParLieu AS
 SELECT 
-	COUNT(pe.id_personnage) AS nbr_perso,
-	l.id_lieu
+	l.id_lieu,
+	l.nom_lieu,
+	COUNT(pe.id_personnage) AS nbr_perso
 FROM
 	personnage pe
 INNER JOIN lieu l ON l.id_lieu = pe.id_lieu
@@ -22,7 +23,8 @@ GROUP BY
 
 SELECT 
 	nbr_perso,
-	id_lieu
+	id_lieu,
+	nom_lieu
 FROM
 	persoParLieu
 GROUP BY 
@@ -191,7 +193,7 @@ HAVING sommeQte >= ALL
 			SELECT SUM(pc.qte) 
 			FROM
 				bataille ba
-			INNER JOIN prendre_casque p ON ba.id_bataille = pc.id_bataille
+			INNER JOIN prendre_casque pc ON ba.id_bataille = pc.id_bataille
 			GROUP BY ba.id_bataille
 		)
 
