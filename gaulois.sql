@@ -272,6 +272,9 @@ INSERT INTO personnage (id_personnage, nom_personnage, adresse_personnage , imag
 
 -- B. Autorisez Bonemine à boire de la potion magique, elle est jalouse d'Iélosubmarine...
 
+DELETE FROM autoriser_boire
+WHERE id_personnage = 12 AND id_potion = 1
+
 INSERT INTO autoriser_boire (id_potion, id_personnage)
 VALUES
 (1, 12);
