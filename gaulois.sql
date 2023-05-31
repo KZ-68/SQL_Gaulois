@@ -13,28 +13,27 @@ WHERE
 CREATE VIEW persoParLieu AS
 SELECT 
 	COUNT(pe.id_personnage) AS nbr_perso,
-	l.nom_lieu
+	l.id_lieu
 FROM
 	personnage pe
 INNER JOIN lieu l ON l.id_lieu = pe.id_lieu
 GROUP BY
-	l.nom_lieu
+	l.id_lieu
 
 SELECT 
 	nbr_perso,
-	nom_lieu
+	id_lieu
 FROM
 	persoParLieu
 GROUP BY 
 	nbr_perso,
-	nom_lieu
+	id_lieu
 ORDER BY 
 	nbr_perso DESC
 
 -- 3. Nom des personnages + spécialité + adresse et lieu d'habitation, triés par lieu puis par nom de personnage.
 
 SELECT 
-	pe.id_personnage,
 	pe.nom_personnage,
 	s.nom_specialite,
 	pe.adresse_personnage,
@@ -44,11 +43,7 @@ FROM
 INNER JOIN lieu l ON l.id_lieu = pe.id_lieu
 INNER JOIN specialite s ON s.id_specialite = pe.id_specialite
 GROUP BY
-	pe.id_personnage,
-	pe.nom_personnage,
-	s.nom_specialite,
-	pe.adresse_personnage,
-	l.nom_lieu
+	pe.id_personnage
 ORDER BY
 	l.nom_lieu,
 	pe.nom_personnage;
@@ -60,27 +55,28 @@ SELECT
 	COUNT(pe.id_personnage) AS nbr_perso,
 	pe.nom_personnage,
 	pe.adresse_personnage,
-    s.nom_specialite
+	s.id_specialite
+	s.nom_specialite
 FROM
 	personnage pe
 INNER JOIN specialite s ON s.id_specialite = pe.id_specialite
 GROUP BY
-	pe.nom_personnage,
+	pe.id_personnage,
 	pe.adresse_personnage,
-    s.nom_specialite
+   	s.nom_specialite
 
 SELECT 
-	nbr_perso,
-   nom_specialite
+	SUM(nbr_perso) AS persoParSpec,
+   	id_specialite,
+	nom_specialite
 FROM
-	persoSpec
+	persoSpecEtLieu
 GROUP BY
-	nbr_perso,
-   nom_specialite
-ORDER BY 
-	nbr_perso DESC
+   	id_specialite
+ORDER BY
+	persoParSpec DESC
 
--- 5. Nom,date etlieu des batailles, classées de la plus récente à la plus ancienne (dates affichées au format jj/mm/aaaa).
+-- 5. Nom, date etlieu des batailles, classées de la plus récente à la plus ancienne (dates affichées au format jj/mm/aaaa).
 
 CREATE VIEW vueDateBataille AS
 SELECT
@@ -109,14 +105,17 @@ ORDER BY
 -- 6. Nom des potions + coût de réalisation de la potion (trié par coût décroissant).
 
 SELECT
+	po.id_potion,
 	po.nom_potion,
-	i.cout_ingredient
+	SUM(i.cout_ingredient*co.qte) AS coutPotion
 FROM
 	composer co
 INNER JOIN potion po ON po.id_potion = co.id_potion
 INNER JOIN ingredient i ON i.id_ingredient = co.id_ingredient
+GROUP BY 
+	po.id_potion
 ORDER BY
-	i.cout_ingredient DESC
+	coutPotion DESC
 
 -- 7. Nom des ingrédients + coût + quantité de chaque ingrédient qui composent la potion 'Santé'.
 
@@ -134,7 +133,8 @@ WHERE po.nom_potion LIKE '%Santé%'
 -- 8. Nom du ou des personnages qui ont pris le plus de casques dans la bataille 'Bataille du village gaulois'.
 
 SELECT
-	nom_personnage,
+	pe.id_personnage,
+	pe.nom_personnage,
 	SUM(pc.qte) AS sommeCasques
 FROM
 	prendre_casque pc
@@ -142,13 +142,13 @@ INNER JOIN personnage pe ON pe.id_personnage = pc.id_personnage
 INNER JOIN bataille ba ON ba.id_bataille = pc.id_bataille
 WHERE ba.nom_bataille LIKE "%Bataille du village gaulois%"
 GROUP BY
-	pe.nom_personnage
+	pe.id_personnage
 -- On utilise un SELECT intérieur pour obtenir la valeur max d'une colonne en rapport avec une autre colonne
 HAVING
 	sommeCasques >= ALL
 	(
 		SELECT
-			MAX(pc.qte) AS sommeCasquesMax
+			SUM(pc.qte) AS sommeCasquesMax
 		FROM
 			prendre_casque pc
 		INNER JOIN bataille ba ON ba.id_bataille = pc.id_bataille
@@ -163,30 +163,44 @@ ORDER BY
 -- 9. Nom des personnages et leur quantité de potion bue (en les classant du plus grand buveur au plus petit).
 
 SELECT
-	nom_personnage,
-	po.nom_potion,
-	bo.dose_boire
+	pe.id_personnage,
+	pe.nom_personnage,
+	SUM(bo.dose_boire) AS qttBue
 FROM
 	boire bo
 INNER JOIN personnage pe ON pe.id_personnage = bo.id_personnage
 INNER JOIN potion po ON po.id_potion = bo.id_potion
+GROUP BY
+	pe.id_personnage
 ORDER BY 
-	bo.dose_boire DESC
+	qttBue DESC
 
 -- 10. Nom de la bataille où le nombre de casques pris a été le plus important.
 
 SELECT 
-nom_personnage,
-nom_bataille, 
-sommeQte
-FROM casqueBataille
-WHERE sommeQte = (SELECT MAX(sommeQte) FROM casqueBataille)
+ba.id_bataille,
+ba.nom_bataille, 
+SUM(pc.qte) AS sommeQte
+FROM
+	bataille ba
+	INNER JOIN prendre_casque pc
+	ON ba.id_bataille = pc.id_bataille 
+GROUP BY ba.id_bataille
+HAVING sommeQte >= ALL 
+		(	
+			SELECT SUM(pc.qte) 
+			FROM
+				bataille ba
+			INNER JOIN prendre_casque p ON ba.id_bataille = pc.id_bataille
+			GROUP BY ba.id_bataille
+		)
 
 -- 11. Combien existe-t-il de casques de chaque type et quel est leur coût total ? (classés par nombre décroissant)
 
-CREATE VIEW casqueCout AS
+CREATE OR REPLACE VIEW casqueCout AS
 SELECT 
 	tc.id_type_casque,
+	COUNT(ca.id_type_casque) AS casqueParType,
 	tc.nom_type_casque,
 	SUM(ca.cout_casque) AS totalCout
 FROM 
@@ -195,13 +209,6 @@ INNER JOIN type_casque tc ON tc.id_type_casque = ca.id_type_casque
 GROUP BY 
 	tc.id_type_casque,
 	tc.nom_type_casque
-
-SELECT 
-	totalCout,
-	id_type_casque,
-	nom_type_casque
-FROM 
-	casqueCout
 ORDER BY 
 	totalCout DESC
 
@@ -219,26 +226,30 @@ WHERE i.nom_ingredient LIKE '%Poisson frais%'
 
 -- 13. Nom du / des lieu(x) possédant le plus d'habitants, en dehors du village gaulois.
 
-CREATE OR REPLACE VIEW persoparlieu AS
-SELECT
-	COUNT(pe.id_personnage) AS nbrPerso,
-	l.nom_lieu
-FROM
-	personnage pe
-INNER JOIN lieu l ON l.id_lieu = pe.id_lieu
-WHERE NOT l.nom_lieu LIKE '%Village gaulois%'
-GROUP BY l.nom_lieu
-
 SELECT 
-	nbrPerso,
-	nom_lieu
-FROM 
-	persoParLieu
-WHERE nbrPerso =
-(SELECT MAX(nbrPerso) FROM persoparlieu WHERE NOT nom_lieu LIKE '%Village gaulois%')
+l.id_lieu,
+l.nom_lieu, 
+COUNT(id_personnage) AS nbrHbts
+FROM
+	lieu l
+	INNER JOIN personnage pe ON pe.id_lieu = l.id_lieu
 GROUP BY 
-	nbrPerso,
-	nom_lieu
+	l.id_lieu	
+HAVING
+	nbrHbts >= ALL
+		(
+		SELECT 
+			COUNT(id_personnage)
+		FROM
+			lieu l
+			INNER JOIN personnage pe ON pe.id_lieu = l.id_lieu										
+		WHERE 
+			l.nom_lieu NOT LIKE '%Village gaulois%'			
+		GROUP BY 
+			l.id_lieu				
+		)		
+AND 
+	l.nom_lieu NOT LIKE  '%Village gaulois%'
 
 -- 14 Nom des personnages qui n'ont jamais bu aucune potion.
 
